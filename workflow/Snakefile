@@ -2,6 +2,9 @@ from snakemake.utils import min_version
 
 min_version("7.12.1")
 
+# if necessary, set a local tmp dir:
+os.environ['TMPDIR']="/scratch2/cropbio/uebermuth/A2TEA-devel/A2TEA.Workflow/tmp/"
+
 import pandas as pd
 import os
 import re

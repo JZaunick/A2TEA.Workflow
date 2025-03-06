@@ -9,6 +9,9 @@
 
 **A**utomated **A**ssessment of **T**rait-specific **E**volutionary **A**daptations
 
+## **02.11.2023: The A2TEA.Workflow is from now on maintained in [https://github.com/groupschoof/A2TEA.Workflow](https://github.com/groupschoof/A2TEA.Workflow)**
+
+
 A2TEA is a tool facilitating exploration of genetic diversity and uncovering evolutionary adaptation to stresses by exploiting genome comparisons and existing RNA-Seq data. In order to identify candidate genes, gene family expansion events - as an important driver of adaptation - are integrated with differential gene expression to link genes to functions.
 
 This workflow combines RNA-seq analyses (differential gene expression) with evolutionary analyses -> gene family expansion events.
@@ -19,28 +22,35 @@ Nevertheless, if possible the workflow should be run with input RNA-Seq reads (b
 This way, valuable phylogenetic information from species without available expression information for the conditions under investigation can be included.  
 Functional information per species can be provided by the user or can be optionally inferred by our tool [AHRD](https://github.com/groupschoof/AHRD) during the workflow.  
 
-You can use the the A2TEA_finished.RData output in your own R terminal/Rstudio or use our **[A2TEA.WebApp](https://github.com/tgstoecker/A2TEA.WebApp)** which was specifically designed to allow for interactive inspection, visualization, filtering & export of the results and subsets. We feature a tutorial for its usage and details on how to work with the results of a A2TEA.Workflow analysis run.
+You can use the A2TEA_finished.RData output in your own R terminal/Rstudio or use our **[A2TEA.WebApp](https://github.com/tgstoecker/A2TEA.WebApp)** which was specifically designed to allow for interactive inspection, visualization, filtering & export of the results and subsets. We feature a tutorial for its usage and details on how to work with the results of a A2TEA.Workflow analysis run.
 
 See the published paper!: [https://f1000research.com/articles/11-1137](https://f1000research.com/articles/11-1137)  
 See the downstream R Shiny WebApp in action!: [https://tgstoecker.shinyapps.io/A2TEA-WebApp/](https://tgstoecker.shinyapps.io/A2TEA-WebApp/)  
 
 # Setup:
+Conda:
 Install the Python 3 version of Miniconda.
 you can get it here: https://docs.conda.io/en/latest/miniconda.html
 
 Answer yes to the question whether conda shall be initialized and put into your PATH.
 
+Mamba:
 Then, you can install [mamba](https://github.com/QuantStack/mamba) (a faster replacement of conda in C++) with:
 
 `conda install -c conda-forge mamba`
+Note: it works with mamba version 1.1.0. Newer versions of mamba are to be tested..
 
-In it's current form, A2TEA requires at least snakemake v7.12.1 - install or upgrade with `mamba install -c conda-forge -c bioconda "snakemake>=7.12.1"`.  
+Snakemake:
+In it's current form, A2TEA requires at least snakemake v7.12.1 and it works with tabulate version 0.8:
+- install or upgrade with `mamba install -c conda-forge -c bioconda "snakemake>=7.12.1 tabulate=0.8"`.  
+
+Or use Container:
 To circumvent dependency issues we also offer a containerized solution via a docker image hosted on dockerhub that can be used (details further below).  
 Usage only requires Singularity to be installed, e.g.: `mamba  install -c conda-forge singularity`.  
 
 Download/Clone the current release of the A2TEA workflow into the directory.
 
-`git clone https://github.com/tgstoecker/A2TEA.Workflow.git`
+`git clone https://github.com/caroue/A2TEA.Workflow.git`
 
 
 ### If you can't provide functional annotations for your genes/transcripts/proteins you will need to also do the following:
@@ -70,6 +80,15 @@ Note again, that these steps are not necessary if you provide functional informa
 Use installation of software during runtime by starting the workflow with the `--use-conda` option.
 This will install seperate small conda environments for groups of or individual rules. However, if requirements & dependencies change, some environments might fail to build.
 
+# If problems, possible solutions are:
+
+- Since on some systems or shared clusters the standard /tmp directory is quite small it can be necessary to change this to another directory.
+A easy solution is to create a tmp directory inside the workflow directory and set the TMPDIR variable in the Snakefile:
+```
+os.environ['TMPDIR']=PATH_TO_CUSTOM_TMP_FOLDER
+```
+- Use the greedy solver of snakemake by adding to the command `snakemake ... --scheduler greedy` because the ILP solver was observed to be really slow
+
 ## Option 2 (Docker container with Singularity - **guaranteed stability but slower**)
 By using the latest version of our docker container image via the combination of the commands `--use-conda --use-singularity` we can circumvent most potential issues that can arise when using option 1.  
 From the Snakemake docs:  
@@ -79,10 +98,10 @@ If during the checkpoint steps many hypotheses are analyzed and the user chose m
 Note that you need to have singularity installed - e.g. `mamba  install -c conda-forge singularity`.  
   
 Since on some systems or shared clusters the standard /tmp directory is quite small it can be necessary to change this to another directory.  
-A easy solution is to reate a tmp directory inside the workflow directory and set the tmpdir singularity env variable to this.  
+A easy solution is to create a tmp directory inside the workflow directory and set the tmpdir singularity env variable to this.  
 ```
-mkdir /scratch2/cropbio/stoecker/A2TEA-pipeline/master_dev/a2tea/tmp/
-export SINGULARITY_TMPDIR=/scratch2/cropbio/stoecker/A2TEA-pipeline/master_dev/a2tea/tmp/
+mkdir /PATH/TO/a2tea/tmp/
+export SINGULARITY_TMPDIR=/PATH/TO/tmp/
 ```
   
 Snakemake scripts sometimes can't find input files when using singularity - this is probably because the correct directories haven't been bind-mounted when singularity was run.  
@@ -193,6 +212,7 @@ It works really well for the annotation files we have tested so far but this is 
 In such cases, changes to the tximport.R script in scripts/ might be necessary - or one switches to the genomic FASTA/ STAR-based approach which directly quantifies at gene-level.  
 For both tximport and (cDNA route) or featureCounts (gDNA route) require an annotation file.
 The workflow uses gffread to standardize any supplied gff, gff3, gtf annotation file to a common .gtf standard so that downstream steps work.  
+We have observed issues with gtf2.2, where transcript_ids can be empty, which gffread cannot handle. We strongly encourage to prefre gff3 over gtf!
     
 ## Some additional important pointers on usage:
 1) Make sure that there are no ":" in your peptide fasta headers (e.g. custom headers) - this will lead to problems because orthofinder exchanges ":" for "_"  
@@ -210,10 +230,16 @@ The workflow uses gffread to standardize any supplied gff, gff3, gtf annotation 
 12) It is possible for a hypothesis to NOT have any expanded OGs - in this case the workflow will provide you with a snakemake error message during the extraction of fasta sequences for expanded OGs: `missing input files for rule fasta_extraction ... wildcards: hypothesis={hypothesis}, OG=empty.txt, ...`. As the dummy file `empty.txt` was written under `tea/{hypothesis}/add_OGs_sets/id_lists/` no expanded OGs exist for the `{hypothesis}`based on the chosen parameters. The user can decide to either adapt parameters or remove the hypothesis from the experiment by deleting it from the config/hypotheses.tsv file. In the latter case, please make sure to adapt the associated hypothesis numbers in the file as well (see 11.)) to 1:N. After this continue/rerun the workflow with the additional flag `--rerun-incomplete`.  
 
 
-## Common resons for errors: 
+## Common reasons for errors: 
 - falsely formatted annotations; e.g. gene_id field is called different in some lines geneID  
 - format of fasta files -> same lengths of lines and shorter; otherwise samtools faidx etc. won't work  
-  
+- see above: tmp dir
+- see above: linking files from a mounted connection somewhere else on the file system  
+- see above: snakemake solver too slow
+- In an experiment, the Rule cafe5_setup couldn't properly execute. Therefore, this rule was done manually in the folder A2TEA.Workflow/CAFE5 with the command
+``` autoconf && ./configure && make ```
+- gffread error with empty transcript_id in gtf2.2. gff3 is the preferred format for the workflow!
+
 # :beginner: Output  
 The final output is a single file - tea/A2TEA_finished.RData.  
 This file can be used in R by using the load() command.  
