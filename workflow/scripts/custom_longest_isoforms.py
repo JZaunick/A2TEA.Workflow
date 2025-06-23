@@ -69,7 +69,7 @@ def GetGeneName_Ensembl(acc_line):
     if len(tokens) != 1: return None
     return tokens[0]
 
-def GetGeneName_Customized(acc_line, keywords, prefix="", suffix=""):
+def GetGeneName_Custom(acc_line, keywords, prefix="", suffix=""):
     tokens = [
         (t.split("=") if "=" in t else t.split(":"))[1]
         for t in acc_line.rstrip().split()
@@ -79,6 +79,17 @@ def GetGeneName_Customized(acc_line, keywords, prefix="", suffix=""):
     if len(tokens) != 1:
         return None
     return f"{prefix}{tokens[0]}{suffix}"
+
+def GetGeneName_ByKey(acc_line, key="gene"):
+    """
+    Extracts the value after 'key=' in the header line.
+    Returns None if not found.
+    """
+    pattern = rf'{re.escape(key)}=([^; ]+)'
+    match = re.search(pattern, acc_line)
+    if match:
+        return match.group(1)
+    return None
 
 def IsNCBI(fn):
     with open(fn, 'r') as infile:
@@ -116,27 +127,39 @@ def GetGeneName_NCBI(acc_line):
         acc_line = acc_line.split(None, 1)[-1]
     return acc_line
 
-def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn, q_use_original_accession_line, **kwargs):
+def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn, q_use_original_accession_line, remove_pattern=None, prefix="", suffix="", **kwargs):
     # Get genes and lengths
     max_gene_lens = defaultdict(int)
+    acc_to_use = defaultdict(str)
+    nAcc = 0
+    nGeneUnidentified = 0
+
     with open(fn, 'r') as infile:
         lines = [l.rstrip() for l in infile]
     N = len(lines) - 1
-    nAcc = 0
-    nGeneUnidentified = 0
-    acc_to_use = defaultdict(str)
+
+    # First pass: Identify the longest sequence for each gene
     iLine = -1
     while iLine < N:
         iLine += 1
         line = lines[iLine]
-        if not line.startswith(">"): continue
+        if not line.startswith(">"):
+            continue
         nAcc += 1
         iLineAcc = iLine
         gene = gene_name_fn(line, **kwargs) if kwargs else gene_name_fn(line)
-        if gene == None:
+        if gene is None:
+            # Fallback: Use the full header (minus ">") if gene_name_fn fails
+            gene = line[1:]
+            if remove_pattern:
+                gene = gene.replace(remove_pattern, "")
             nGeneUnidentified += 1
-            continue
-        # get length
+        else:
+            # Apply remove_pattern to the extracted gene name
+            if remove_pattern:
+                gene = gene.replace(remove_pattern, "")
+
+        # Calculate sequence length
         l = 0
         while iLine < N:
             iLine += 1
@@ -145,33 +168,55 @@ def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn, q_use_original_accessio
                 iLine -= 1
                 break
             l += len(line.rstrip())
+
+        # Update the longest sequence for the gene
         if l > max_gene_lens[gene]:
             max_gene_lens[gene] = l
             acc_to_use[gene] = iLineAcc
-    print("Found %d accessions, %d genes, %d unidentified transcripts" % (nAcc, len(max_gene_lens), nGeneUnidentified))
-    # print(gene)
-    # print(sorted(max_gene_lens.keys())[:10])
-    # print(len(set(max_gene_lens.keys())))
 
-    # Get longest version for each gene
-    # Parse file second time and only write out sequences that are longest variant
+    print("Found %d accessions, %d genes, %d unidentified transcripts" % (nAcc, len(max_gene_lens), nGeneUnidentified))
+
+    # Second pass: Write the longest sequences to the output file
     nGenesWriten = 0
-    outfn = dout
-    with open(outfn, 'w') as outfile:
+    with open(dout, 'w') as outfile:
         iLine = -1
         while iLine < N:
             iLine += 1
             line = lines[iLine]
-            if not line.startswith(">"): continue
+            if not line.startswith(">"):
+                continue
             gene = gene_name_fn(line, **kwargs) if kwargs else gene_name_fn(line)
-            # transcripts not identifying the gene should be written
-            if gene != None and iLine != acc_to_use[gene]: continue
-            if q_use_original_accession_line or gene == None:
-                acc_line_out = line + "\n"
+            if gene is None:
+                # Fallback: Use the full header (minus ">") if gene_name_fn fails
+                gene = line[1:]
+                if remove_pattern:
+                    gene = gene.replace(remove_pattern, "")
             else:
-                 acc_line_out = ">%s\n" % gene
-            nGenesWriten += 1
+                # Apply remove_pattern to the extracted gene name
+                if remove_pattern:
+                    gene = gene.replace(remove_pattern, "")
+
+            # Skip sequences that are not the longest for their gene
+            if gene not in acc_to_use or iLine != acc_to_use[gene]:
+                continue
+
+            # Add prefix and suffix to the gene name
+            gene = f"{prefix}{gene}{suffix}"
+
+            # Write the header
+            if q_use_original_accession_line:
+                # Use the original header as-is
+                acc_line_out = line + "\n"
+            elif gene_name_fn == GetGeneName_NCBI:
+                # For NCBI, only use the ID part of the header (everything before the first space)
+                acc_line_out = line.split(" ", 1)[0] + "\n"
+            else:
+                # Default behavior: Use the extracted gene name with prefix and suffix
+                acc_line_out = f">{gene}\n"
             outfile.write(acc_line_out)
+
+            # Write the sequence
+            nGenesWriten += 1
             while iLine < N:
                 iLine += 1
                 line = lines[iLine]
@@ -179,11 +224,12 @@ def CreatePrimaryTranscriptsFile(fn, dout, gene_name_fn, q_use_original_accessio
                     iLine -= 1
                     break
                 outfile.write(line + "\n")
+
     print("Wrote %d genes" % nGenesWriten)
-    if nGenesWriten != len(max_gene_lens) + nGeneUnidentified:
-        print("ERROR")
+    if nGenesWriten != len(max_gene_lens):
+        print("ERROR: Mismatch in the number of genes written.")
         raise Exception
-    print(outfn)
+    print("Output written to:", dout)
 
 
 def last_dot(text):
@@ -194,17 +240,20 @@ def space(text):
     return text[1:].rstrip().split(None, 1)[0]
 
 
-function_dict = {"last_dot":last_dot, "space":space}
+function_dict = {"last_dot": last_dot, "space": space}
 
 def main():
     parser = argparse.ArgumentParser(description="Extract longest isoforms from a FASTA file.")
     parser.add_argument("input_file", help="Path to the input FASTA file.")
     parser.add_argument("output_file", help="Path to the output FASTA file.")
-    parser.add_argument("--gene_name_function", choices=["ensembl", "ncbi", "customized"], default="ensembl",
+    parser.add_argument("--gene_name_function", choices=["ensembl", "ncbi", "customized", "by_key"], default="ensembl",
                         help="Function to use for extracting gene names. Default is 'ensembl'.")
-    parser.add_argument("--keywords", nargs="*", default=[], help="Keywords for the customized gene name function.")
-    parser.add_argument("--prefix", default="", help="Prefix to add to gene names (used with 'customized').")
-    parser.add_argument("--suffix", default="", help="Suffix to add to gene names (used with 'customized').")
+    parser.add_argument("--key", default="gene",
+                        help="Key to search for in the header when using 'by_key' function (default: 'gene').")
+    parser.add_argument("--keywords", nargs="*", default=[], help="name of the gene id to use for filtering for the custom gene name function.")
+    parser.add_argument("--prefix", default="", help="Prefix to add to gene names (used with 'custom').")
+    parser.add_argument("--suffix", default="", help="Suffix to add to gene names (used with 'custom').")
+    parser.add_argument("--remove_pattern", default="", help="pattern to remove from gene ids).")
     parser.add_argument("--use_original_accession", action="store_true", default=False,
                         help="Flag to use the original accession line in the output. Default is False.")
 
@@ -220,17 +269,24 @@ def main():
         gene_name_fn = GetGeneName_Ensembl
     elif args.gene_name_function == "ncbi":
         gene_name_fn = GetGeneName_NCBI
-    elif args.gene_name_function == "customized":
-        gene_name_fn = GetGeneName_Customized
+    elif args.gene_name_function == "custom":
+        gene_name_fn = GetGeneName_Custom
         kwargs = {"keywords": args.keywords, "prefix": args.prefix, "suffix": args.suffix}
+    elif args.gene_name_function == "by_key":
+        gene_name_fn = GetGeneName_ByKey
+        kwargs = {"key": args.key}
 
     CreatePrimaryTranscriptsFile(
         args.input_file,
         args.output_file,
         gene_name_fn,
         args.use_original_accession,
+        args.remove_pattern,
+        prefix=args.prefix,
+        suffix=args.suffix,
         **kwargs
     )
+
 
 if __name__ == "__main__":
     main()
