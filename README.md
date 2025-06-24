@@ -50,7 +50,7 @@ Usage only requires Singularity to be installed, e.g.: `mamba  install -c conda-
 
 Download/Clone the current release of the A2TEA workflow into the directory.
 
-`git clone https://github.com/caroue/A2TEA.Workflow.git`
+`git clone https://github.com/groupschoof/A2TEA.Workflow.git`
 
 
 ### If you can't provide functional annotations for your genes/transcripts/proteins you will need to also do the following:
@@ -239,6 +239,19 @@ We have observed issues with gtf2.2, where transcript_ids can be empty, which gf
 - In an experiment, the Rule cafe5_setup couldn't properly execute. Therefore, this rule was done manually in the folder A2TEA.Workflow/CAFE5 with the command
 ``` autoconf && ./configure && make ```
 - gffread error with empty transcript_id in gtf2.2. gff3 is the preferred format for the workflow!
+- NCBI data was error prone due to the header format in our runs (e.g. wrong filtering results; no match with gene id from annotation) -> see section How to deal with ID mismatches
+
+### How to deal with ID mismatches
+    1) writing a new pep fasta file with gffread that contains all infos from the annotation
+        `gffread PATH/TO/ANNOTATION.gff -g PATH/TO/GENOMIC.fna -FSy PATH/TO/OUTPUT.fasta
+    2) manually filter for longest isoforms e.g. with the custom_longest_isoforms.py script
+       make sure that the output only contains the correct gene IDs in the header, if needed (you can add a prefix/suffix or delete a part of the IDs)
+       example:
+        `python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py Lbar_proteins_with_all_infos.fasta Lbar_filtered_from_gff_newfunction.fasta --gene_name_function by_key --key gene`
+        (for help on usage run: `python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py --help`)
+    3) apply the manually filtering to all your other pep fastas 
+    4) change `auto_isoform_filtering` to `"YES"`in the config.yaml
+    5) don't forget to change the pep_fasta column in the species.tsv to the path of the filtered pep fastas
 
 # :beginner: Output  
 The final output is a single file - tea/A2TEA_finished.RData.  
