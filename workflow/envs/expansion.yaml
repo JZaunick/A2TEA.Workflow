@@ -23,3 +23,4 @@ dependencies:
   - trimal >=1.4
   - fasttree >=2.1.10
   - bash >=5.1.16
+  - cafe ==5.1.0
