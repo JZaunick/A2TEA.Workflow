@@ -242,16 +242,16 @@ We have observed issues with gtf2.2, where transcript_ids can be empty, which gf
 - NCBI data was error prone due to the header format in our runs (e.g. wrong filtering results; no match with gene id from annotation) -> see section How to deal with ID mismatches
 
 ### How to deal with ID mismatches
-    1) writing a new pep fasta file with gffread that contains all infos from the annotation
+  1) writing a new pep fasta file with gffread that contains all infos from the annotation
         `gffread PATH/TO/ANNOTATION.gff -g PATH/TO/GENOMIC.fna -FSy PATH/TO/OUTPUT.fasta
-    2) manually filter for longest isoforms e.g. with the custom_longest_isoforms.py script
-       make sure that the output only contains the correct gene IDs in the header, if needed (you can add a prefix/suffix or delete a part of the IDs)
-       example:
-        `python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py Lbar_proteins_with_all_infos.fasta Lbar_filtered_from_gff_newfunction.fasta --gene_name_function by_key --key gene`
-        (for help on usage run: `python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py --help`)
-    3) apply the manually filtering to all your other pep fastas 
-    4) change `auto_isoform_filtering` to `"YES"`in the config.yaml
-    5) don't forget to change the pep_fasta column in the species.tsv to the path of the filtered pep fastas
+  2) manually filter for longest isoforms e.g. with the custom_longest_isoforms.py script
+  make sure that the output only contains the correct gene IDs in the header, if needed (you can add a prefix/suffix or delete a part of the IDs)
+  example:
+    ```python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py Lbar_proteins_with_all_infos.fasta Lbar_filtered_from_gff_newfunction.fasta --gene_name_function by_key --key gene```
+  (for help on usage run: `python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py --help`)
+  3) apply the manually filtering to all your other pep fastas 
+  4) change `auto_isoform_filtering` to `"YES"` in the config.yaml
+  5) don't forget to change the pep_fasta column in the species.tsv to the path of the filtered pep fastas
 
 # :beginner: Output  
 The final output is a single file - tea/A2TEA_finished.RData.  
