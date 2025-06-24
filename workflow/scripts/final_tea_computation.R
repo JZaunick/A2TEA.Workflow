@@ -120,6 +120,13 @@ for (i in species_list) {
     # also add a species column which will will also come in handy during the shiny steps
     species <- replicate(nrow(df_with_genes), i)
     df_with_genes <- add_column(df_with_genes, species, .before = "gene")
+    # check if HOG-genes and DE-genes match
+    nr_common_genes <- length(intersect(df_with_genes$gene, unlist(strsplit(HOG_file_raw[[i]], ","))))
+    if (nr_common_genes == 0) {
+        print(paste0("Warning!! No common genes between DE results and HOGs for species: ", i, " please check if the gene names in the input files match!", "\n", "You might want to consider custom isoform filtering"))
+    } else {
+        print(paste0("Found ", nr_common_genes, " common genes between DE results and HOGs for species: ", i))
+    }
     # create list of dataframes, which will come in handy
     list_AllSpeciesDEResultsDataFrames[[i]] <- df_with_genes
 }
