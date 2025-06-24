@@ -1,30 +1,13 @@
-# CAFE5 analysis
+## CAFE5 analysis
 # requires orthofinder to be finished
 
-# install & compile CAFE5
-# by far the "unsafest" step in the workflow - if no conda integration in the future; should either be optional or perhaps s part of container..
-rule cafe5_setup:
-    input:
-        ORTHOFINDER + "complete.check"
-    output:
-        "CAFE5/bin/cafe5"
-    conda:
-        "../envs/cafe5_compile.yaml"
-    shell:
-        """
-        rm -rf CAFE5/;
-        git clone https://github.com/tgstoecker/CAFE5;
-        cd CAFE5/;
-        autoconf &&
-        ./configure &&
-        make
-        """
-
+# install & compile CAFE5 -> removed this step and tried to integrate conda installation of CAFE5
+# TODO: testrun to see if it works as intended..
 
 # generate an ultrametric species tree from orthofinder output
 rule ultrametric_species_tree:
     input:
-        "CAFE5/bin/cafe5"
+        ORTHOFINDER + "complete.check"
     output:
         "cafe/{hypothesis}/SpeciesTree_rooted_node_labels.txt.ultrametric.tre",
     params:
@@ -93,8 +76,12 @@ rule cafe5_filtered_set:
         table = "cafe/{hypothesis}/HOG_table_reformatted_filtered.tsv",
     output:
         directory("cafe/{hypothesis}/cafe_filtered_results"),
+    conda:
+        "../envs/expansion.yaml"
     shell:
-        "CAFE5/bin/cafe5 --cores 32 -i {input.table} -t {input.tree} -o {output} -k 3"
+        """
+        cafe5 --cores 32 -i {input.table} -t {input.tree} -o {output} -k 3
+        """
 
 
 # custom function to extract lambda value from first run of CAFE5 with filtered set
@@ -126,7 +113,7 @@ rule cafe5_complete_set:
         filtered_results = rules.cafe5_filtered_set.output,
         expansion = rules.expansion_checkpoint_finish.output,
     output:
-        directory("cafe/{hypothesis}/cafe_complete_results")
+        directory("cafe/{hypothesis}/cafe_complete_results"),
     params:
         lambda_value = get_lambda_value,
         hypothesis = "{hypothesis}",
@@ -134,7 +121,7 @@ rule cafe5_complete_set:
         "../envs/expansion.yaml"
     shell:
         """
-        CAFE5/bin/cafe5 --cores 64 -i {input.table} -t {input.tree} -o {output} -k 3 -l {params.lambda_value} -P 0.05;
+        cafe5 --cores 64 -i {input.table} -t {input.tree} -o {output} -k 3 -l {params.lambda_value} -P 0.05;
         if ! [ -s {output}/Gamma_family_results.txt ]; then
           echo "Will create dummy file with p=0.999 for current hypothesis"
           ls -1 tea/{params.hypothesis}/expansion_cp_target_OGs/ |\

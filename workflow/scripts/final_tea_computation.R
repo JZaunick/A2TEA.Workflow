@@ -562,7 +562,7 @@ for (i in 1:length(hypotheses$hypothesis)) {
     h_species_compared <- intersect(h_compared_to, species_list)
 
     #only perform these steps when there are species in expanded and compared with expression data
-    if(length(h_species_expanded) != 0 & length(h_species_compared) != 0) {
+    if(length(h_species_expanded) == length(h_expanded_in) & length(h_species_compared) == length(h_compared_to)) {
 
       HOG_level_list[[i]] <- HOG_level_list[[i]] %>%
         mutate(
