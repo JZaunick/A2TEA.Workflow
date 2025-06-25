@@ -157,6 +157,7 @@ species.tsv:
     
 samples.tsv:  
 - provide details for the fastq files you deposited/symlinked into rawreads/
+- IMPORTANT: The samples must be ordered by species and for each species first control then treatment fastqs
 - only when using cDNA FASTA and single-end reads for a species you NEED to add information to the fragment_length_mean column (single-end read length) as well as the standard deviation to the samples.tsv file
   
 hypotheses.tsv (formulate hypotheses regarding your supplied data):  
@@ -183,9 +184,9 @@ hypotheses.tsv (formulate hypotheses regarding your supplied data):
 	- very stable for standard fasta files from e.g. Ensembl, NCBI, etc.
 	- when not set to "YES", we assume you performed appropiate (or no) filtering yourself
 	- choosing automatic isoform filtering will create a subset peptide fasta file with only the longest isoform per gene; the header will be shortened to JUST the gene name identifier; this option MUST be used in conjunction with transcript_level_quantification: "NO"
-	- if you perform the filtering yourself and want to perform gene level Diff. Exp. Analysis take care to have the fasta headers for a protein to be the simple gene identifier (no .1; .p3; etc.)
+	- if you perform the filtering yourself and want to perform gene level Diff. Exp. Analysis take care to have the fasta headers for a protein to be the simple gene identifier (no .1; .p3; etc.) 
 	- this is important since for the differential expression analysis we use tximport to reduce the cdna based quantification with tximport/kallisto to gene level (featureCounts if DNA fasta supplied), and association between orthology and expression analysis is the purpose of this software
-	- IN ANY USE-CASE: THE NAMES BETWEEN PEP. FASTA AND EITHER GENES OR TRANSCRIPTS IN THE SPECIES SPECIFIC GTF HAS TO MATCH!!
+	- IN ANY USE-CASE: THE NAMES BETWEEN PEP. FASTA AND EITHER GENES OR TRANSCRIPTS IN THE SPECIES SPECIFIC GTF HAS TO MATCH!! -> see secton How to deal with ID mismatches if you don't know how to do this
 	- some examples:
 		- case 1. you have standard fasta and annotation files from ensembl/NCBI; want to have one rep. protein seq. per GENE and trust the automatic process -> auto_isoform_filtering: "YES" & transcript_level_quantification: "NO"
 		- case 2. you filtered for longest isoform yourself (peptide fasta headers = gene names in respective gtf!) and are ok with the names being reduced to gene identifier -> auto_isoform_filtering: "NO" & transcript_level_quantification: "NO"
@@ -241,16 +242,21 @@ We have observed issues with gtf2.2, where transcript_ids can be empty, which gf
 - gffread error with empty transcript_id in gtf2.2. gff3 is the preferred format for the workflow!
 - NCBI data was error prone due to the header format in our runs (e.g. wrong filtering results; no match with gene id from annotation) -> see section How to deal with ID mismatches
 
-### How to deal with ID mismatches
+### How to deal with ID mismatches:
+Issues with a mismatch of IDs between annotation/pep fasta are common and the automated approach doesn't always work well. Especially when not using standard ensembl data. In our runs, NCBI formatted pep fastas caused most issues. We found that the following approach worked quite well:
+
   1) writing a new pep fasta file with gffread that contains all infos from the annotation
-        `gffread PATH/TO/ANNOTATION.gff -g PATH/TO/GENOMIC.fna -FSy PATH/TO/OUTPUT.fasta
-  2) manually filter for longest isoforms e.g. with the custom_longest_isoforms.py script
-  make sure that the output only contains the correct gene IDs in the header, if needed (you can add a prefix/suffix or delete a part of the IDs)
+        `gffread PATH/TO/ANNOTATION.gff -g PATH/TO/GENOMIC.fna -FSy PATH/TO/OUTPUT.fasta`
+  2) manually filter for longest isoforms. We used the custom_longest_isoforms.py script that can be found under workflow/scripts
+  make sure that the output only contains the correct gene IDs in the header, if needed you can add a prefix/suffix or delete a part of the IDs, in case the formatting of the headers is somehow messed up, try using the `--gene_name_function by_key` option
+
   example:
-    ```python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py Lbar_proteins_with_all_infos.fasta Lbar_filtered_from_gff_newfunction.fasta --gene_name_function by_key --key gene```
+    
+    ```python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py PATH/TO/INPUT.fasta PATH/TO/OUTPUT.fasta --gene_name_function by_key --key gene```
+  
   (for help on usage run: `python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py --help`)
-  3) apply the manually filtering to all your other pep fastas 
-  4) change `auto_isoform_filtering` to `"YES"` in the config.yaml
+  3) apply the manually filtering to all your other pep fastas, too
+  4) change `auto_isoform_filtering` to `"NO"` in the config.yaml
   5) don't forget to change the pep_fasta column in the species.tsv to the path of the filtered pep fastas
 
 # :beginner: Output  

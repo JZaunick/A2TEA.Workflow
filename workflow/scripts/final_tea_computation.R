@@ -108,6 +108,29 @@ for (i in 1:length(dea_list_short)){
 #print(h_species)
 ############ TEST
 
+## Create long format HOG-genes relation table
+HOG_file_raw <- read_delim("orthofinder/final-results/Phylogenetic_Hierarchical_Orthogroups/N0.tsv", delim = "\t")
+
+#drop the OG, Gene Tree Parent Clade
+HOG_file_short <- HOG_file_raw %>% select (-c(OG, `Gene Tree Parent Clade`)) 
+
+
+#merge all species columns into one and remove the solo ones
+#use all colnames except first - thus all species
+HOG_file_merged <- HOG_file_short %>% unite(x,
+                                          c(colnames(HOG_file_short)[-1]),
+                                          sep = ",", 
+                                          na.rm = TRUE,
+                                          remove = TRUE)
+
+#transform into long format - each row 1 gene and it's corresponding HOG in seperate columns
+HOG_file_long <- HOG_file_merged %>%
+                    mutate(unpacked = str_split(x, ",")) %>%
+                    unnest(cols = c(unpacked)) %>%
+                    mutate(genes = str_trim(unpacked)) %>% 
+                    select(-c(x, unpacked)) %>% 
+                    rename(gene = genes)
+
 
 list_AllSpeciesDEResultsDataFrames <- list()
 
@@ -134,28 +157,6 @@ for (i in species_list) {
 combined_AllSpeciesDEResultsDataFrames <- do.call("rbind", list_AllSpeciesDEResultsDataFrames)
 
 
-## Create long format HOG-genes relation table
-HOG_file_raw <- read_delim("orthofinder/final-results/Phylogenetic_Hierarchical_Orthogroups/N0.tsv", delim = "\t")
-
-#drop the OG, Gene Tree Parent Clade
-HOG_file_short <- HOG_file_raw %>% select (-c(OG, `Gene Tree Parent Clade`)) 
-
-
-#merge all species columns into one and remove the solo ones
-#use all colnames except first - thus all species
-HOG_file_merged <- HOG_file_short %>% unite(x,
-                                          c(colnames(HOG_file_short)[-1]),
-                                          sep = ",", 
-                                          na.rm = TRUE,
-                                          remove = TRUE)
-
-#transform into long format - each row 1 gene and it's corresponding HOG in seperate columns
-HOG_file_long <- HOG_file_merged %>%
-                    mutate(unpacked = str_split(x, ",")) %>%
-                    unnest(cols = c(unpacked)) %>%
-                    mutate(genes = str_trim(unpacked)) %>% 
-                    select(-c(x, unpacked)) %>% 
-                    rename(gene = genes)
 
 
 ## Adding specific HOG or singleton info as HOG column to DE tables
