@@ -10,7 +10,9 @@ import os
 import re
 import yaml
 
-os.environ['TMPDIR']="/scratch2/cropbio/uebermuth/A2TEA-devel/A2TEA.Workflow/tmp/"
+
+# set the tmp dir to a local directory, if needed (e.g. if used on shared cluster with limited tmp space)
+#os.environ['TMPDIR']="/scratch2/cropbio/user/A2TEA-devel/A2TEA.Workflow/tmp/"
 
 #pandas actually truncates too long names.. if you don't stop it ;D
 pd.set_option("display.max_colwidth", 10000)

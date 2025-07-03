@@ -80,14 +80,6 @@ Note again, that these steps are not necessary if you provide functional informa
 Use installation of software during runtime by starting the workflow with the `--use-conda` option.
 This will install seperate small conda environments for groups of or individual rules. However, if requirements & dependencies change, some environments might fail to build.
 
-# If problems, possible solutions are:
-
-- Since on some systems or shared clusters the standard /tmp directory is quite small it can be necessary to change this to another directory.
-A easy solution is to create a tmp directory inside the workflow directory and set the TMPDIR variable in the Snakefile:
-```
-os.environ['TMPDIR']=PATH_TO_CUSTOM_TMP_FOLDER
-```
-- Use the greedy solver of snakemake by adding to the command `snakemake ... --scheduler greedy` because the ILP solver was observed to be really slow
 
 ## Option 2 (Docker container with Singularity - **guaranteed stability but slower**)
 By using the latest version of our docker container image via the combination of the commands `--use-conda --use-singularity` we can circumvent most potential issues that can arise when using option 1.  
@@ -133,17 +125,25 @@ By running the the script `get_test_data.sh` all of these input files are automa
 
 # :control_knobs: General usage
 ## Recommended steps
-1) Add or symlink all fastq files to the rawreads directory:  
+
+### 1) Prepare Input Files
+
+**Fastq files:**
+- Add or symlink all fastq files to the rawreads directory:  
   FASTQ files -> rawreads/  
   The config/samples.tsv that you need to adapt to your data/experiments expects the files to be located here.
 
-2) Add or symlink all fasta & annotation files to a directory of your choosing - or just take note where this data is located on your file system.
-   The species.tsv file (explained in detail in 3.)) allows A2TEA to find these files.
+**Fasta and Annotation files:**
+- if needed (e.g. when using NCBI data), preprocess your pep fastas so that gene/transcript names across the files match up (see: "How to deal with ID mismatches" section for details)
+- Add or symlink all fasta & annotation files to a directory of your choosing - or just take note where this data is located on your file system.
+   The species.tsv file (explained in detail in 2.)) allows A2TEA to find these files.
    E.g. if you create a directory called 'FS/' in the main A2TEA directory and copy/symlink all fasta/annotation files there, then you have to refer to them as e.g. FS/fasta.fa in the species.tsv file.
 
 
-3) Modify species.tsv, samples.tsv & hypotheses.tsv files  
-species.tsv:  
+### 2) Prepare Config Files
+- Modify the files in the config directory
+
+**species.tsv:**
 - provide species name, species ploidy, a peptide fasta, an annotation file (.gff;.gff3;.gtf) as well as either a genomic or cDNA fasta (alignment or pseudoalignment), respectively
 - if you don't possess transcriptomic data for a species simply leave the genomic, cDNA fasta and annotation positions empty
 - files can be gzipped, or functioning URLs
@@ -155,13 +155,16 @@ species.tsv:
 	- multiple gene ontology terms per gene/transcript must be seperated by ", "
 	- more work in progress here ... automatic parsing and functional enrichment in the future (will require check for gene/transcript identifiers as well...)
     
-samples.tsv:  
+**samples.tsv:**  
 - provide details for the fastq files you deposited/symlinked into rawreads/
 - IMPORTANT: The samples must be ordered by species and for each species first control then treatment fastqs
 - only when using cDNA FASTA and single-end reads for a species you NEED to add information to the fragment_length_mean column (single-end read length) as well as the standard deviation to the samples.tsv file
   
-hypotheses.tsv (formulate hypotheses regarding your supplied data):  
-(!NOTE: "min_expansion_factor" & "min_expansion_difference" are seperate criteria - if either one is passed the orthologous group will be used in downstream steps)  
+
+**hypotheses.tsv:**\
+formulate hypotheses regarding your supplied data
+
+
 - hypothesis - (integer) index number of hypothesis starting at 1 (don't skip any integers!)
 - name - (string) descriptive name (in quotations!); e.g. "Expanded in Arabidopsis compared to Monocots"
 - expanded_in - (string) one or multiple species (seperated by ";") which are checked for gene family expansion events compared to one or multiple species (seperated by ";") under compared_to
@@ -172,31 +175,50 @@ hypotheses.tsv (formulate hypotheses regarding your supplied data):
 - min_expansion_difference - (integer) minimum # of additional genes expanded_in species possesses in contrast to compared_to species (per orthologous group) (!NOTE: set to unrealistically high integer - e.g. 100 - to use only "min_expansion_factor" criterium)
 - Nmin_expanded_genes - (integer) minimum # of genes of expanded species required to consider the OG for expansion; this option can be left at 0 for most analyses (ratio/difference selection) but helps if the ratio/difference based methods lead to unexpected results in very small OGs in cases where ploidy normalization was performed
 - expanded_in_all_found - (boolean) does every memeber of expanded_in species have to be present (not expanded!) in the orthologous_group
-- compared_to_all_found - (boolean) does every memeber of compared_to species have to be present (not expanded!) in the orthologous_group
-  
-4) Using the activated environment perform a dry-run and check for problems with:    
-`snakemake -np`  
-   Ignore warning messages (pink) such as "The code used to generate one or several output files has changed: ...". 
+- compared_to_all_found - (boolean) does every memeber of compared_to species have to be present (not expanded!) in the orthologous_group\
+\
+(!NOTE: "min_expansion_factor" & "min_expansion_difference" are seperate criteria - if either one is passed the orthologous group will be used in downstream steps)  
 
-5) Configure the config.yaml file to your needs  
+**config.yaml:** 
 - here you can adjust options for trimming, thread usage per rule and much more
 - very important are the choices for automatic filtering for longest isoform of fasta files and whether gene or transcript level quantification/diff. exp. analysis should be performed (auto_isoform_filtering: "NO" & transcript_level_quantification: "YES")
-	- very stable for standard fasta files from e.g. Ensembl, NCBI, etc.
+	- very stable for standard fasta files from e.g. Ensembl (NCBI fastas might cause issues, though. Check 'Common reasons for errors' section for details) 
 	- when not set to "YES", we assume you performed appropiate (or no) filtering yourself
 	- choosing automatic isoform filtering will create a subset peptide fasta file with only the longest isoform per gene; the header will be shortened to JUST the gene name identifier; this option MUST be used in conjunction with transcript_level_quantification: "NO"
 	- if you perform the filtering yourself and want to perform gene level Diff. Exp. Analysis take care to have the fasta headers for a protein to be the simple gene identifier (no .1; .p3; etc.) 
 	- this is important since for the differential expression analysis we use tximport to reduce the cdna based quantification with tximport/kallisto to gene level (featureCounts if DNA fasta supplied), and association between orthology and expression analysis is the purpose of this software
 	- IN ANY USE-CASE: THE NAMES BETWEEN PEP. FASTA AND EITHER GENES OR TRANSCRIPTS IN THE SPECIES SPECIFIC GTF HAS TO MATCH!! -> see secton How to deal with ID mismatches if you don't know how to do this
 	- some examples:
-		- case 1. you have standard fasta and annotation files from ensembl/NCBI; want to have one rep. protein seq. per GENE and trust the automatic process -> auto_isoform_filtering: "YES" & transcript_level_quantification: "NO"
+		- case 1. you have standard fasta and annotation files from ensembl; want to have one rep. protein seq. per GENE and trust the automatic process -> auto_isoform_filtering: "YES" & transcript_level_quantification: "NO"
 		- case 2. you filtered for longest isoform yourself (peptide fasta headers = gene names in respective gtf!) and are ok with the names being reduced to gene identifier -> auto_isoform_filtering: "NO" & transcript_level_quantification: "NO"
 		- case 3. you don't want to our filter & either want to use the whole or a custom subset of the transcriptome -> auto_isoform_filtering: "NO" & transcript_level_quantification: "YES"; this is the hands-on case in which you the USER are mostly responsible; again, both featureCounts/tximport(kallisto) will produce count tables with the transcript names as found in the gtf; these transcript names have to match the headers in the peptide fasta files (e.g. removing additional info from common fasta headers "sed '/^>/ s/ .*//' file.fasta")
 
+### 3) Define custom tmp dir (optional)
 
-6) Run A2TEA with (exchange XX for the amount of cores you can offer):  
-`snakemake --cores XX --use-conda`  (add `--use-singularity` if you want to use the singularity image - option 2)  
-- Note that a dry-run can be performed which is likely to tell you of missing files etc. with `snakemake --cores XX --use-conda -np`.  
-- When using the `--use-singularity` option, depending on your compute environment, it can be advantageous to explicitly define the `tmp/` and `cache/` locations. This is due to these locations often defaulting to shared /tmp/ locations that may be quite limited in terms of storage space or general user permissions. To circumvent this, we provide two directories `workflow/singularity_run/tmp/` and `workflow/singularity_run/cache/` which you can use as locations by explicitly defining/exporting the appropiate environment variables:
+- Since on some systems or shared clusters the standard /tmp directory is quite small it can be necessary to change this to another directory.
+An easy solution is to create a tmp directory inside the workflow directory and set the TMPDIR variable in the Snakefile:
+```
+os.environ['TMPDIR']=PATH_TO_CUSTOM_TMP_FOLDER
+```
+
+### 4) Run A2Tea
+
+
+- Using the activated environment perform a dry-run and check for problems with:    
+`snakemake -np`  
+   Ignore warning messages (pink) such as "The code used to generate one or several output files has changed: ...". 
+
+#### Option 1: Run A2Tea without Singularity
+
+- If you are not using singularity, start the workflow with the following command, exchanging XX for the amount of cores you can offer:  
+`snakemake --cores XX --use-conda`  
+
+- NOTE: we observed the ILP solver to be quite slow in some test-runs, so we recommend using the greedy solver instead by adding `--scheduler greedy`to the command
+
+#### Option 2: Run A2Tea with Singularity
+- if you want to use the singularity image, add `--use-singularity` to the command, i.e.:\
+`snakemake --cores XX --use-conda --use-singularity` 
+- When using this option, depending on your compute environment, it can be advantageous to explicitly define the `tmp/` and `cache/` locations. This is due to these locations often defaulting to shared /tmp/ locations that may be quite limited in terms of storage space or general user permissions. To circumvent this, we provide two directories `workflow/singularity_run/tmp/` and `workflow/singularity_run/cache/` which you can use as locations by explicitly defining/exporting the appropiate environment variables:
 	```
 	export SINGULARITY_TMPDIR=/full-path-to-A2TEA.Workflow/workflow/singularity_run/tmp/
 	export SINGULARITY_CACHEDIR=/full-path-to-A2TEA.Workflow/workflow/singularity_run/cache/
@@ -217,7 +239,7 @@ We have observed issues with gtf2.2, where transcript_ids can be empty, which gf
     
 ## Some additional important pointers on usage:
 1) Make sure that there are no ":" in your peptide fasta headers (e.g. custom headers) - this will lead to problems because orthofinder exchanges ":" for "_"  
-2) As explained under General Usage 5) it is important that pep. fasta headers and either gene or transcript names as found in the annotation match. If you perform isoform filtering yourself, take note that transcripts not found in the pep. fasta won't be part of the downstream phylogenetic and combinatory analyses. These additional transcripts will however be quantified and their differential expression calculated. In the final diff. exp. output HOG_DE.a2tea they will appear but will be put into the singleton category. Depending on your downstream analyses you should consider removing such cases. An easy workaround is simply removing all secondary transcripts/isoforms from the annotation files as well before starting A2TEA.  
+2) As explained under General Usage 1) it is important that pep. fasta headers and either gene or transcript names as found in the annotation match. If you perform isoform filtering yourself, take note that transcripts not found in the pep. fasta won't be part of the downstream phylogenetic and combinatory analyses. These additional transcripts will however be quantified and their differential expression calculated. In the final diff. exp. output HOG_DE.a2tea they will appear but will be put into the singleton category. Depending on your downstream analyses you should consider removing such cases. An easy workaround is simply removing all secondary transcripts/isoforms from the annotation files as well before starting A2TEA.  
 3) Species name between samples.tsv, species.tsv & hypotheses.tsv HAS to match up!  
 4) Add the appropiate path "path/to/file" before the files in the species.tsv table  
 5) Do NOT provide both a cDNA and genome fasta for a given species in the species.tsv file! However using cDNA fasta for one species and genome fasta for another is totally fine.  
@@ -228,22 +250,24 @@ We have observed issues with gtf2.2, where transcript_ids can be empty, which gf
 10) With "add_OGs:" in the config.yaml you can define the max number of closest orthologous groups to include in the follow-up analyses. The next based blast hit belonging to another OG will lead to include this OG in an addtional set; if set to e.g. 3 for each expanded OG we include the next three "closest" OGs
 ; if there aren't any usable blast hits less than 3 will be added. Tree visualizations often are more informative if we use more than an individual OG and allow to pinpoint mistakes in the tree generation or the MSA.  
 11) Make sure that hypotheses in the hypotheses.tsv are numbered 1:N and you don't skip any number or start with anoher integer!  
-12) It is possible for a hypothesis to NOT have any expanded OGs - in this case the workflow will provide you with a snakemake error message during the extraction of fasta sequences for expanded OGs: `missing input files for rule fasta_extraction ... wildcards: hypothesis={hypothesis}, OG=empty.txt, ...`. As the dummy file `empty.txt` was written under `tea/{hypothesis}/add_OGs_sets/id_lists/` no expanded OGs exist for the `{hypothesis}`based on the chosen parameters. The user can decide to either adapt parameters or remove the hypothesis from the experiment by deleting it from the config/hypotheses.tsv file. In the latter case, please make sure to adapt the associated hypothesis numbers in the file as well (see 11.)) to 1:N. After this continue/rerun the workflow with the additional flag `--rerun-incomplete`.  
+12) It is possible for a hypothesis to NOT have any expanded OGs - in this case the workflow will provide you with a snakemake error message during the extraction of fasta sequences for expanded OGs: `missing input files for rule fasta_extraction ... wildcards: hypothesis={hypothesis}, OG=empty.txt, ...`. As the dummy file `empty.txt` was written under `tea/{hypothesis}/add_OGs_sets/id_lists/` no expanded OGs exist for the `{hypothesis}`based on the chosen parameters. The user can decide to either adapt parameters or remove the hypothesis from the experiment by deleting it from the config/hypotheses.tsv file. In the latter case, please make sure to adapt the associated hypothesis numbers in the file as well (see 11.)) to 1:N. After this continue/rerun the workflow with the additional flag `--rerun-incomplete`.
 
 
 ## Common reasons for errors: 
 - falsely formatted annotations; e.g. gene_id field is called different in some lines geneID  
 - format of fasta files -> same lengths of lines and shorter; otherwise samtools faidx etc. won't work  
-- see above: tmp dir
+
 - see above: linking files from a mounted connection somewhere else on the file system  
 - see above: snakemake solver too slow
 - In an experiment, the Rule cafe5_setup couldn't properly execute. Therefore, this rule was done manually in the folder A2TEA.Workflow/CAFE5 with the command
 ``` autoconf && ./configure && make ```
 - gffread error with empty transcript_id in gtf2.2. gff3 is the preferred format for the workflow!
-- NCBI data was error prone due to the header format in our runs (e.g. wrong filtering results; no match with gene id from annotation) -> see section How to deal with ID mismatches
+- NCBI data was error prone in our runs due to the header format  (e.g. wrong filtering results; no match with gene id from annotation) -> see section How to deal with ID mismatches
+
+
 
 ### How to deal with ID mismatches:
-Issues with a mismatch of IDs between annotation/pep fasta are common and the automated approach doesn't always work well. Especially when not using standard ensembl data. In our runs, NCBI formatted pep fastas caused most issues. We found that the following approach worked quite well:
+Issues with a mismatch of IDs between annotation/fastas are common and the automated approach doesn't always work well, especially when not using standard ensembl data. In our runs, NCBI formatted pep fastas caused most issues. We found that the following approach worked quite well:
 
   1) writing a new pep fasta file with gffread that contains all infos from the annotation
         `gffread PATH/TO/ANNOTATION.gff -g PATH/TO/GENOMIC.fna -FSy PATH/TO/OUTPUT.fasta`
