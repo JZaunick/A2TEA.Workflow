@@ -201,21 +201,21 @@ An easy solution is to create a tmp directory inside the workflow directory and 
 os.environ['TMPDIR']=PATH_TO_CUSTOM_TMP_FOLDER
 ```
 
-### 4) Run A2Tea
+### 4) Run A2TEA
 
 
 - Using the activated environment perform a dry-run and check for problems with:    
 `snakemake -np`  
    Ignore warning messages (pink) such as "The code used to generate one or several output files has changed: ...". 
 
-#### Option 1: Run A2Tea without Singularity
+#### Option 1: Run A2TEA without Singularity
 
 - If you are not using singularity, start the workflow with the following command, exchanging XX for the amount of cores you can offer:  
 `snakemake --cores XX --use-conda`  
 
 - NOTE: we observed the ILP solver to be quite slow in some test-runs, so we recommend using the greedy solver instead by adding `--scheduler greedy`to the command
 
-#### Option 2: Run A2Tea with Singularity
+#### Option 2: Run A2TEA with Singularity
 - if you want to use the singularity image, add `--use-singularity` to the command, i.e.:\
 `snakemake --cores XX --use-conda --use-singularity` 
 - When using this option, depending on your compute environment, it can be advantageous to explicitly define the `tmp/` and `cache/` locations. This is due to these locations often defaulting to shared /tmp/ locations that may be quite limited in terms of storage space or general user permissions. To circumvent this, we provide two directories `workflow/singularity_run/tmp/` and `workflow/singularity_run/cache/` which you can use as locations by explicitly defining/exporting the appropiate environment variables:
