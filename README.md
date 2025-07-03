@@ -276,9 +276,10 @@ Issues with a mismatch of IDs between annotation/fastas are common and the autom
 
   example:
     
-    ```python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py PATH/TO/INPUT.fasta PATH/TO/OUTPUT.fasta --gene_name_function by_key --key gene```
+    python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py PATH/TO/INPUT.fasta PATH/TO/OUTPUT.fasta --gene_name_function by_key --key gene
   
   (for help on usage run: `python3 PATH/TO/workflow/scripts/custom_longest_isoforms.py --help`)
+
   3) apply the manually filtering to all your other pep fastas, too
   4) change `auto_isoform_filtering` to `"NO"` in the config.yaml
   5) don't forget to change the pep_fasta column in the species.tsv to the path of the filtered pep fastas
