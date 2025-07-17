@@ -48,8 +48,12 @@ rownames(gfs_snakemake.wildcards) = gfs_snakemake.wildcards[,1]
 ## Check if sample names created match with the column names of featurecounts. both ## ## should match 
 all(rownames(gfs_snakemake.wildcards) %in% colnames(counts))
 
-dds = DESeqDataSetFromMatrix(countData = counts, colData = gfs_snakemake.wildcards, design = ~ condition)
+dds = DESeqDataSetFromMatrix(countData = counts, colData = gfs_snakemake.wildcards,  = ~ condition)
 #dea = DESeq(dds)
+<<<<<<< HEAD
+=======
+design
+>>>>>>> 8516618b9f6fc465481d37ea6bf1ec0b9fb759b8
 # if normal DESeq function fails due to lack of dispersion use alternative way:
 # "all gene-wise dispersion estimates are within 2 orders of magnitude"
 # "<<-" global assignment
